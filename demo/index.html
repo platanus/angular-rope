@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title></title>
+  <script type="application/javascript" src="../bower_components/angular/angular.js"></script>
+  <script type="application/javascript" src="../bower_components/angular-inflector/dist/angular-inflector.js"></script>
+  <script type="application/javascript" src="../src/rope.js"></script>
+  <script type="application/javascript" src="app.js"></script>
+</head>
+<body ng-app="demo">
+  <div ng-controller="DemoCtrl">
+    <form name="form">
+      <input type="text" validation-group="demo" name="foo" ng-model="input.foo" show-error="error1" validate="required, async, is form.bar.$viewValue == $value as not-equal"></input>
+      <br>
+      Error: {{ error1 }}
+      <br>
+      <input type="text" name="bar" ng-model="input.bar" show-error="error2" validate="required, is form.foo.$viewValue == $value as not-equal"></input>
+      <br>
+      Error: {{ error2 }}
+    </form>
+  </div>
+</body>
+</html>

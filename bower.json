@@ -1,0 +1,28 @@
+{
+  "name": "angular-rope",
+  "version": "0.1.0",
+  "authors": [
+    "Ignacio Baixas <ignacio@platan.us>"
+  ],
+  "description": "Angular Promise Chaining Service",
+  "license": "MIT",
+  "homepage": "https://github.com/platanus/angular-rope",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/platanus/angular-rope.git"
+  },
+  "main": "./dist/angular-rope.min.js",
+  "ignore": [
+    "**/.*",
+    "Gruntfile.js",
+    "karma.conf.js",
+    "package.json",
+    "test",
+    "src",
+    ".travis.yml"
+  ],
+  "devDependencies": {
+    "angular": "*",
+    "angular-mocks": "*"
+  }
+}
