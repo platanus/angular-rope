@@ -72,6 +72,8 @@ angular.module('platanus.rope')
 
 ## Usage
 
+The general idea is to define tasks and then chain them to produce different action sequences.
+
 `next` is used to chain tasks, promises, functions and values. To start a new chain call `rope.next`.
 
 ```javascript
@@ -107,7 +109,6 @@ rope.seed('hello')
     .next(service.willAppend('world'))
     .next(function(_val) { console.log(_val); }) // will output 'hello world'
 ```
-
 
 If an error occurs inside one of the tasks, then following tasks are skipped until error is handled.
 
