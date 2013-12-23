@@ -335,6 +335,16 @@ angular.module('platanus.rope', [])
 				});
 			});
 		}
+
+		// wait: function(_seconds/*, _for */) {
+		// 	this.promise.then(function(_value) {
+		// 		var defer = $q.defer();
+		// 		$timeout(function() {
+		// 			defer.resolve(_value);
+		// 		}, _seconds);
+		// 		return defer.promise;
+		// 	});
+		// }
 	};
 
 	// The root chain acts as the service api, it is extended with some additional methods.
@@ -368,13 +378,8 @@ angular.module('platanus.rope', [])
 			return function() {
 				var args = arguments, self = this;
 				return function(_value) {
-					var oldValue = self.$value;
-					self.$value = unseed(_value);
-					try {
-						return _fun.apply(self, args);
-					} finally {
-						self.$value = oldValue;
-					}
+					var r = _fun.apply(self, args);
+					return typeof r === 'function' ? r.call(self, unseed(_value)) : r;
 				};
 			};
 		},

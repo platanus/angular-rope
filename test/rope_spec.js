@@ -32,6 +32,41 @@ describe('', function() {
 		});
 	}]));
 
+	describe('task', function() {
+
+		it('should generate a function that returns a function', function() {
+			var handler = jasmine.createSpy(),
+				task = rope.task(handler);
+
+			expect(typeof task).toBe('function');
+			expect(typeof task('hello')).toBe('function');
+			expect(handler).not.toHaveBeenCalled();
+
+			task('hello')();
+			expect(handler).toHaveBeenCalledWith('hello');
+		});
+
+		it('should preserve context', function() {
+			var ctx, service = { task: rope.task(function() {
+				ctx = this;
+			}) };
+
+			service.task()();
+			expect(ctx).toBe(service);
+		});
+
+		it('should have access to last value by returning a function', function() {
+			var last, service = { task: rope.task(function() {
+				return function(_value) {
+					last = _value;
+				};
+			}) };
+
+			service.task()('hello');
+			expect(last).toEqual('hello');
+		});
+	});
+
 	describe('next', function() {
 
 		it('should execute nested calls in proper order', function() {

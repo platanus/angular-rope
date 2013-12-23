@@ -89,7 +89,9 @@ Steps in a chain are executed sequentially.
 
 Try to use **tasks** whenever posible, tasks are properly isolated and will prevent unwanted code to be run before is needed.
 
-You define *tasks* by calling the `rope.task` method. When called inside a task chain, a tasks behaves likes a regular method but with access to the previous task exit value through the $value context property.
+You define *tasks* by using *task factories*, tasks factories are created using the `rope.task` method with a task handler. Tasks factories will generate tasks bound to calling context and arguments. Tasks can be passed to every chain operation, the task handler will only be called when the task is executed and it will be given the attributes and context used to invoke the factory.
+
+If access to the previous task/promise value is required, then the handler must return a function that will inmediatelly be called with the value as unique argument and in the same context as the handler.
 
 Its recommended to use a common prefix (like 'will') for tasks to differentiated them from methods.
 
@@ -99,8 +101,10 @@ var service = {
     return true;
   },
   willAppend: rope.task(function(_someArg) {
-    if(this.otherMethod()) { // reference to this is maintained
-      return this.$value + ' ' + _someArg; // this.$value holds previous task exit value.
+    return function(_last) { // if a function is returned, it is called inmediatelly with last value.
+      if(this.otherMethod()) { // reference to this is maintained
+        return _last + ' ' + _someArg;
+      }
     }
   })
 };
