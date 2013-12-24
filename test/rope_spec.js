@@ -67,6 +67,37 @@ describe('', function() {
 		});
 	});
 
+	describe('inherit', function() {
+
+		it('should inherit parent context status if no errors', function() {
+			var spyS = jasmine.createSpy('success'), spyE = jasmine.createSpy('error');
+
+			rope.seed('something')
+				.next(function() {
+					rope.inherit()
+						.next(spyS)
+						.handle(spyE);
+				});
+
+			expect(spyS).toHaveBeenCalledWith('something');
+			expect(spyE).not.toHaveBeenCalled();
+		});
+
+		it('should inherit parent context status if no error', function() {
+			var spyS = jasmine.createSpy('success'), spyE = jasmine.createSpy('error');
+
+			rope.next(function() { return rope.reject('an error'); })
+				.always(function() {
+					rope.inherit()
+						.next(spyS)
+						.handle(spyE);
+				});
+
+			expect(spyS).not.toHaveBeenCalled();
+			expect(spyE).toHaveBeenCalledWith('an error');
+		});
+	});
+
 	describe('next', function() {
 
 		it('should execute nested calls in proper order', function() {
@@ -203,6 +234,47 @@ describe('', function() {
 				.handle(function(_err) { other = _err; });
 
 			expect(other).toEqual(err);
+		});
+	});
+
+	describe('always', function() {
+
+		it('should be called on success or error', function() {
+			var spyS = jasmine.createSpy('success'), spyE = jasmine.createSpy('error');
+
+			rope.seed('wharever')
+				.always(spyS)
+				.next(function() { rope.reject(); })
+				.always(spyE);
+
+			expect(spyS).toHaveBeenCalled();
+			expect(spyE).toHaveBeenCalled();
+		});
+
+		it('shouldnt handle a rejection', function() {
+
+			var spyE1 = jasmine.createSpy('error A'),
+				spyE2 = jasmine.createSpy('error B');
+
+			rope.next(function() { return rope.reject('teapot'); })
+				.always(function() { return 'handle this!'; })
+				.handle(spyE1)
+				.next(function() { return rope.reject('teapot'); })
+				.always(function() { return rope.reject('toaster'); })
+				.handle(spyE2);
+
+			expect(spyE1).toHaveBeenCalledWith('teapot');
+			expect(spyE2).toHaveBeenCalledWith('teapot');
+		});
+
+		it('should accept a promise', function() {
+			var spy = jasmine.createSpy('next');
+
+			rope.seed('toaster')
+				.always(rope.confer('teapot'))
+				.next(spy);
+
+			expect(spy).toHaveBeenCalledWith('teapot');
 		});
 	});
 
