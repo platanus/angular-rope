@@ -1,6 +1,6 @@
 /**
  * Angular Promise Chaining Service
- * @version v0.2.0 - 2013-12-23
+ * @version v0.2.1 - 2013-12-24
  * @link https://github.com/platanus/angular-rope
  * @author Ignacio Baixas <ignacio@platan.us>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -14,8 +14,7 @@ angular.module('platanus.rope', [])
  */
 .factory('rope', ['$q', function ($q) {
 
-	var chains = null, // The current promise chain
-		context = null; // The current context
+	var status = null; // The current status
 
 	function confer(_value) {
 		if(_value && typeof _value.then === 'function') return _value;
@@ -69,39 +68,45 @@ angular.module('platanus.rope', [])
 		};
 	}
 
-	function tick(_ctx, _fun, _value) {
-		var oldChains, oldContext, rval, chainLen, i;
+	function tick(_ctx, _fun, _data, _error) {
+		var oldStatus, rval, chainLen, i;
 		if(typeof _fun === 'function') {
 			try {
-				oldChains = chains;
-				oldContext = context;
-				chains = [];
-				context = _ctx;
+				oldStatus = status;
+				status = {
+					chains: [],		// the child chains
+					context: _ctx,	// propagate default context
+					data: _data,	// store data in case inheritance is used
+					error: _error	// store status flag in case inheritance is used
+				};
 
-				rval = _fun.call(context, _value);
+				rval = _fun.call(_ctx, _data);
 			} finally {
 
 				// process child chains (if any).
-				chainLen = chains.length;
-				if(chainLen == 1) {
+				chainLen = status.chains.length;
+				if(chainLen === 1) {
 					// if only one, just chain it
-					rval = chains[0].promise;
+					rval = status.chains[0].promise;
 				} else if(chainLen > 1) {
 					// join all child chains
 					rval = [];
 					for(i = 0; i < chainLen; i++) {
-						rval.push(chains[i].promise);
+						rval.push(status.chains[i].promise);
 					}
 					rval = $q.all(rval);
 				}
 
-				chains = oldChains;
-				context = oldContext;
+				status = oldStatus;
 			}
 			return rval;
 		} else {
 			return _fun;
 		}
+	}
+
+	function context(_override) {
+		return _override || (status ? status.context : null);
 	}
 
 	function Seed(_value) {
@@ -115,7 +120,7 @@ angular.module('platanus.rope', [])
 	// The chain class, holds the state of the current task chain, also acts as the root chain.
 	function Chain(_promise) {
 		this.promise = _promise;
-		if(chains) chains.push(this);
+		if(status) status.chains.push(this);
 	}
 
 	Chain.prototype = {
@@ -138,17 +143,17 @@ angular.module('platanus.rope', [])
 		/**
 		 * Adds a task to the execution queue.
 		 *
-		 * @param  {[type]}   _fun [description]
-		 * @param  {[type]}   _ctx [description]
+		 * @param  {function} _fun task, handler, value or promise
+		 * @param  {object} _ctx optional call context
 		 * @return {Chain} self
 		 */
 		next: function(_fun, _ctx) {
 
-			var self = this, ctx = _ctx || context;
+			var self = this, ctx = context(_ctx);
 
 			this.promise = this.promise.then(function(_val) {
 				if(!self.$$skip()) {
-					return tick(ctx, _fun, unseed(_val));
+					return tick(ctx, _fun, unseed(_val), false);
 				}
 			});
 
@@ -158,18 +163,18 @@ angular.module('platanus.rope', [])
 		/**
 		 * Adds a tasks to handle error that ocurr in previous steps.
 		 *
-		 * @param  {[type]} _fun [description]
-		 * @param  {[type]} _ctx [description]
+		 * @param  {function} _fun task, handler, value or promise
+		 * @param  {object} _ctx optional call context
 		 * @return {Chain} self
 		 */
-		handle: function( _fun, _ctx) {
+		handle: function(_fun, _ctx) {
 
-			var self = this, ctx = _ctx || context;
+			var self = this, ctx = context(_ctx);
 
-			this.promise = this.promise.then(null, function(_reason) {
+			this.promise = this.promise.then(null, function(_error) {
 				// TODO: improve behavior, recovery, handle certain errors only, etc.
 				if(!self.$$skip()) {
-					return confer(tick(ctx, _fun, _reason));
+					return confer(tick(ctx, _fun, _error, true));
 				}
 			});
 
@@ -179,19 +184,23 @@ angular.module('platanus.rope', [])
 		/**
 		 * Adds a tasks to be executed even if previous tasks fail.
 		 *
-		 * @param  {[type]} _fun [description]
-		 * @param  {[type]} _ctx [description]
+		 * @param  {function} _fun task, handler, value or promise
+		 * @param  {object} _ctx optional call context
 		 * @return {Chain} self
 		 */
 		always: function(_fun, _ctx) {
 
-			var self = this, ctx = _ctx || context;
-
-			this.promise = this.promise['finally'](function() {
-				if(!self.$$skip()) {
-					return confer(tick(ctx, _fun));
-				}
-			});
+			this.next(function() {
+				// value is not passed through
+				return typeof _fun === 'function' ? _fun.apply(this) : _fun;
+			}, _ctx).handle(function(_error) {
+				// rejection cannot be handled
+				return confer(typeof _fun === 'function' ? _fun.apply(this) : _fun).then(function() {
+					return reject(_error);
+				}, function() {
+					return reject(_error);
+				});
+			}, _ctx);
 
 			return this;
 		},
@@ -239,7 +248,7 @@ angular.module('platanus.rope', [])
 						self.$$cstack = [];
 					}
 					if(typeof _fun !== 'undefined') {
-						return confer(tick(_ctx, _fun, unseed(_value))).then(function(_bool) {
+						return confer(tick(_ctx, _fun, unseed(_value), true)).then(function(_bool) {
 							self.$$cstack.push(!!_bool);
 							return _value;
 						});
@@ -268,7 +277,7 @@ angular.module('platanus.rope', [])
 				.then(function(_value) {
 					var lastVal = self.$$cstack[self.$$cstack.length-1];
 					if(lastVal === false) {
-						return confer(tick(_ctx, _fun, unseed(_value))).then(function(_bool) {
+						return confer(tick(_ctx, _fun, unseed(_value), true)).then(function(_bool) {
 							self.$$cstack.pop();
 							self.$$cstack.push(!!_bool);
 							return _value;
@@ -394,8 +403,22 @@ angular.module('platanus.rope', [])
 			};
 		},
 
+		/**
+		 * Allows a child chain to inherit the status status (error or not)
+		 *
+		 * This is usefull for tasks than need to access the current status to perform
+		 * certain different actions.
+		 *
+		 * @return {Chain} new chain
+		 */
+		inherit: function() {
+			return new Chain(
+				status.error ? reject(status.data) : confer(status.data)
+			);
+		},
+
 		seed: function(_value) {
-			return (new Chain(confer(new Seed(_value))));
+			return new Chain(confer(new Seed(_value)));
 		},
 
 		next: function(_fun, _ctx) {
