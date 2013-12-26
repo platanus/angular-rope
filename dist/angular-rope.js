@@ -1,6 +1,6 @@
 /**
  * Angular Promise Chaining Service
- * @version v0.2.2 - 2013-12-26
+ * @version v0.2.3 - 2013-12-26
  * @link https://github.com/platanus/angular-rope
  * @author Ignacio Baixas <ignacio@platan.us>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -26,16 +26,14 @@ angular.module('platanus.rope', [])
 			then: function(_cb) {
 				if(!_cb) return this;
 				try {
-					var newValue = _cb(_value);
-					return typeof newValue !== 'undefined' ? confer(newValue) : this;
+					return confer(_cb(_value));
 				} catch(e) {
 					return reject(e);
 				}
 			},
 			'finally': function(_cb) {
 				try {
-					var newValue = _cb();
-					return typeof newValue !== 'undefined' ? confer(newValue) : this;
+					return confer(_cb());
 				} catch(e) {
 					return reject(e);
 				}
@@ -51,16 +49,15 @@ angular.module('platanus.rope', [])
 			then: function(_, _cb) {
 				if(!_cb) return this;
 				try {
-					var newValue = _cb(_reason);
-					return typeof newValue !== 'undefined' ? confer(newValue) : this;
+					return confer(_cb(_reason));
 				} catch(e) {
 					return reject(e);
 				}
 			},
 			'finally': function(_cb) {
 				try {
-					var newValue = _cb();
-					return typeof newValue !== 'undefined' ? reject(newValue) : this;
+					_cb();
+					return this; // cannot handle error in finally
 				} catch(e) {
 					return reject(e);
 				}
@@ -102,7 +99,8 @@ angular.module('platanus.rope', [])
 			}
 		}
 
-		return rval;
+		// on non error ticks, use last value if function does not return anything
+		return typeof rval === 'undefined' && !_error ? _data : rval;
 	}
 
 	function context(_override) {
@@ -154,6 +152,8 @@ angular.module('platanus.rope', [])
 			this.promise = this.promise.then(function(_val) {
 				if(!self.$$skip()) {
 					return tick(ctx, _fun, unseed(_val), false);
+				} else {
+					return _val; // propagate
 				}
 			});
 
@@ -175,6 +175,8 @@ angular.module('platanus.rope', [])
 				// TODO: improve behavior, recovery, handle certain errors only, etc.
 				if(!self.$$skip()) {
 					return confer(tick(ctx, _fun, _error, true));
+				} else {
+					return reject(_error); // propagate
 				}
 			});
 
@@ -247,13 +249,16 @@ angular.module('platanus.rope', [])
 					if(!self.$$cstack) {
 						self.$$cstack = [];
 					}
+
 					if(typeof _fun !== 'undefined') {
-						return confer(tick(_ctx, _fun, unseed(_value), true)).then(function(_bool) {
+						return confer(tick(_ctx, _fun, unseed(_value), false)).then(function(_bool) {
 							self.$$cstack.push(!!_bool);
 							return _value;
 						});
 					} else {
+						// just use previous value
 						self.$$cstack.push(_value);
+						return _value;
 					}
 				})
 				.then(null, function(_err) {
@@ -277,7 +282,7 @@ angular.module('platanus.rope', [])
 				.then(function(_value) {
 					var lastVal = self.$$cstack[self.$$cstack.length-1];
 					if(lastVal === false) {
-						return confer(tick(_ctx, _fun, unseed(_value), true)).then(function(_bool) {
+						return confer(tick(_ctx, _fun, unseed(_value), false)).then(function(_bool) {
 							self.$$cstack.pop();
 							self.$$cstack.push(!!_bool);
 							return _value;
@@ -286,6 +291,8 @@ angular.module('platanus.rope', [])
 						self.$$cstack.pop();
 						self.$$cstack.push(null); // use null to flag so no other or/orWhen call enters
 					}
+
+					return _value;
 				})
 				.then(null, function(_err) {
 					self.$$cstack.pop();
