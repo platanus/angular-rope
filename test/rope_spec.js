@@ -48,7 +48,9 @@ describe('', function() {
 
 		it('should preserve context', function() {
 			var ctx, service = { task: rope.task(function() {
-				ctx = this;
+				rope.next(function() {
+					ctx = this;
+				});
 			}) };
 
 			service.task()();

@@ -357,7 +357,7 @@ angular.module('platanus.rope', [])
 	};
 
 	// The root chain acts as the service api, it is extended with some additional methods.
-	return {
+	var rootNode = {
 		confer: confer,
 		reject: reject,
 
@@ -387,8 +387,10 @@ angular.module('platanus.rope', [])
 			return function() {
 				var args = arguments, self = this;
 				return function(_value) {
-					var r = _fun.apply(self, args);
-					return typeof r === 'function' ? r.call(self, unseed(_value)) : r;
+					// isolate task context inside a new chain.
+					rootNode.seed(_value).next(function() {
+						return _fun.apply(this, args);
+					}, self);
 				};
 			};
 		},
@@ -402,9 +404,7 @@ angular.module('platanus.rope', [])
 		 * @return {Chain} new chain
 		 */
 		inherit: function() {
-			return new Chain(
-				status.error ? reject(status.data) : confer(status.data)
-			);
+			return new Chain(status.error ? reject(status.data) : confer(status.data));
 		},
 
 		seed: function(_value) {
@@ -419,4 +419,6 @@ angular.module('platanus.rope', [])
 			return (new Chain(confer(null))).nextIf(_fun, _ctx);
 		}
 	};
+
+	return rootNode;
 }]);
