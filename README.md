@@ -237,4 +237,12 @@ rope.next(doSomething)
     .next(doSomethingDelayed);
 ```
 
+`call` and `apply` can be used to execute a method on the last returned value given the method's name. They differ in that `apply` will take an array of arguments an pass it as the method arguments and `call` will pass each individual argument directly to the method (like javascript's call and apply).
+
+```javascript
+rope.seed({ method: function(_log) { console.log(_log); } })
+    .call('method', 'im a teapot')
+    .apply('method', [ 'im a flying toaster' ]);
+```
+
 TODO: forkEach

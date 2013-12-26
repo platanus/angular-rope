@@ -349,6 +349,30 @@ angular.module('platanus.rope', [])
 		},
 
 		/**
+		 * Executes a function named `_fun` on the last returned value.
+		 *
+		 * @param  {string} _fun Function to execute
+		 * @param  {Array} _args Arguments to pass
+		 * @return {Chain} self
+		 */
+		apply: function(_fun, _args) {
+			return this.next(function(_value) {
+				return _value[_fun].apply(_value, _args);
+			});
+		},
+
+		/**
+		 * Similar to `apply`, but passes the function arguments directly instead of using an array.
+		 *
+		 * @param  {string} _fun Function to execute
+		 * @return {Chain} self
+		 */
+		call: function(_fun /*, args */) {
+			var args = Array.prototype.slice.call(arguments, 1);
+			return this.apply(_fun, args);
+		},
+
+		/**
 		 * TODO.
 		 *
 		 * @param  {[type]} _fun [description]

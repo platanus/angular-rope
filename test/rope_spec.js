@@ -310,6 +310,30 @@ describe('', function() {
 		});
 	});
 
+	describe('call', function() {
+
+		it('should execute a given last value method', function() {
+			var spy = jasmine.createSpy('call'),
+				test = { spy: spy };
+
+			rope.next(test).call('spy', 'bongiorno');
+
+			expect(spy).toHaveBeenCalledWith('bongiorno');
+		});
+	});
+
+	describe('apply', function() {
+
+		it('should execute a given last value method', function() {
+			var spy = jasmine.createSpy('apply'),
+				test = { spy: spy };
+
+			rope.next(test).apply('spy', ['bongiorno']);
+
+			expect(spy).toHaveBeenCalledWith('bongiorno');
+		});
+	});
+
 	describe('flow control:', function() {
 
 		describe('nextIf', function() {
