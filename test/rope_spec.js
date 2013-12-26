@@ -191,6 +191,17 @@ describe('', function() {
 			expect(spy).toHaveBeenCalledWith('hello world');
 		});
 
+		it('should keep last value if a task returns nothing', function() {
+			var spy = jasmine.createSpy('keeper');
+
+			rope.seed('hao')
+				.next(function() {  })
+				.next(function() {  })
+				.next(spy);
+
+			expect(spy).toHaveBeenCalledWith('hao');
+		});
+
 		it('should wait for every child to join', function() {
 
 		});
