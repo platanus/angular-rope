@@ -1,6 +1,6 @@
 /**
  * Angular Promise Chaining Service
- * @version v0.2.1 - 2013-12-24
+ * @version v0.2.2 - 2013-12-26
  * @link https://github.com/platanus/angular-rope
  * @author Ignacio Baixas <ignacio@platan.us>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -12,7 +12,7 @@ angular.module('platanus.rope', [])
 /**
  * Promise chaining service.
  */
-.factory('rope', ['$q', function ($q) {
+.factory('rope', ['$q', '$timeout', function ($q, $timeout) {
 
 	var status = null; // The current status
 
@@ -69,8 +69,9 @@ angular.module('platanus.rope', [])
 	}
 
 	function tick(_ctx, _fun, _data, _error) {
-		var oldStatus, rval, chainLen, i;
-		if(typeof _fun === 'function') {
+		var rval = _fun, oldStatus, chainLen, i;
+
+		while(typeof rval === 'function') {
 			try {
 				oldStatus = status;
 				status = {
@@ -80,7 +81,7 @@ angular.module('platanus.rope', [])
 					error: _error	// store status flag in case inheritance is used
 				};
 
-				rval = _fun.call(_ctx, _data);
+				rval = rval.call(_ctx, _data);
 			} finally {
 
 				// process child chains (if any).
@@ -99,10 +100,9 @@ angular.module('platanus.rope', [])
 
 				status = oldStatus;
 			}
-			return rval;
-		} else {
-			return _fun;
 		}
+
+		return rval;
 	}
 
 	function context(_override) {
@@ -341,6 +341,48 @@ angular.module('platanus.rope', [])
 		},
 
 		/**
+		 * Halts chain execution for _time milliseconds.
+		 *
+		 * @param  {float} _time Time to sleep (in ms)
+		 * @return {Chain} self
+		 */
+		wait: function(_time/*, _for */) {
+			this.promise = this.promise.then(function(_value) {
+				var defer = $q.defer();
+				$timeout(function() {
+					defer.resolve(_value);
+				}, _time);
+				return defer.promise;
+			});
+
+			return this;
+		},
+
+		/**
+		 * Executes a function named `_fun` on the last returned value.
+		 *
+		 * @param  {string} _fun Function to execute
+		 * @param  {Array} _args Arguments to pass
+		 * @return {Chain} self
+		 */
+		apply: function(_fun, _args) {
+			return this.next(function(_value) {
+				return _value[_fun].apply(_value, _args);
+			});
+		},
+
+		/**
+		 * Similar to `apply`, but passes the function arguments directly instead of using an array.
+		 *
+		 * @param  {string} _fun Function to execute
+		 * @return {Chain} self
+		 */
+		call: function(_fun /*, args */) {
+			var args = Array.prototype.slice.call(arguments, 1);
+			return this.apply(_fun, args);
+		},
+
+		/**
 		 * TODO.
 		 *
 		 * @param  {[type]} _fun [description]
@@ -348,26 +390,16 @@ angular.module('platanus.rope', [])
 		 * @return {[type]}      [description]
 		 */
 		forkEach: function(_fun, _ctx) {
-			this.next(function(_value) {
+			return this.next(function(_value) {
 				angular.forEach(_value, function(_value) {
 					(new Chain(confer(_value))).next(_fun, _ctx);
 				});
 			});
 		}
-
-		// wait: function(_seconds/*, _for */) {
-		// 	this.promise.then(function(_value) {
-		// 		var defer = $q.defer();
-		// 		$timeout(function() {
-		// 			defer.resolve(_value);
-		// 		}, _seconds);
-		// 		return defer.promise;
-		// 	});
-		// }
 	};
 
 	// The root chain acts as the service api, it is extended with some additional methods.
-	return {
+	var rootNode = {
 		confer: confer,
 		reject: reject,
 
@@ -397,8 +429,10 @@ angular.module('platanus.rope', [])
 			return function() {
 				var args = arguments, self = this;
 				return function(_value) {
-					var r = _fun.apply(self, args);
-					return typeof r === 'function' ? r.call(self, unseed(_value)) : r;
+					// isolate task context inside a new chain.
+					rootNode.seed(_value).next(function() {
+						return _fun.apply(this, args);
+					}, self);
 				};
 			};
 		},
@@ -412,9 +446,7 @@ angular.module('platanus.rope', [])
 		 * @return {Chain} new chain
 		 */
 		inherit: function() {
-			return new Chain(
-				status.error ? reject(status.data) : confer(status.data)
-			);
+			return new Chain(status.error ? reject(status.data) : confer(status.data));
 		},
 
 		seed: function(_value) {
@@ -429,5 +461,7 @@ angular.module('platanus.rope', [])
 			return (new Chain(confer(null))).nextIf(_fun, _ctx);
 		}
 	};
+
+	return rootNode;
 }]);
 })(angular);
