@@ -176,6 +176,18 @@ describe('', function() {
 			expect(calls).toEqual(['hello', 'world', 'bye']);
 		});
 
+		it('should execute a function returned by a callback passing the current value, until no more functions are returned', function() {
+			var spy = jasmine.createSpy('nested');
+			rope.seed('hello world')
+				.next(function() {
+					return function() {
+						return spy;
+					};
+				});
+
+			expect(spy).toHaveBeenCalledWith('hello world');
+		});
+
 		it('should wait for every child to join', function() {
 
 		});

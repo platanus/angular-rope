@@ -59,8 +59,9 @@ angular.module('platanus.rope', [])
 	}
 
 	function tick(_ctx, _fun, _data, _error) {
-		var oldStatus, rval, chainLen, i;
-		if(typeof _fun === 'function') {
+		var rval = _fun, oldStatus, chainLen, i;
+
+		while(typeof rval === 'function') {
 			try {
 				oldStatus = status;
 				status = {
@@ -70,7 +71,7 @@ angular.module('platanus.rope', [])
 					error: _error	// store status flag in case inheritance is used
 				};
 
-				rval = _fun.call(_ctx, _data);
+				rval = rval.call(_ctx, _data);
 			} finally {
 
 				// process child chains (if any).
@@ -89,10 +90,9 @@ angular.module('platanus.rope', [])
 
 				status = oldStatus;
 			}
-			return rval;
-		} else {
-			return _fun;
 		}
+
+		return rval;
 	}
 
 	function context(_override) {
