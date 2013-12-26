@@ -18,12 +18,13 @@ describe('', function() {
 		});
 	}));
 
-	var rope, tasks, $q, $rootScope, calls, willCall;
-	beforeEach(inject(['rope', 'TaskService', '$q', '$rootScope', function(_rope, _tasks, _$q, _$rootScope) {
-		rope = _rope;
-		tasks = _tasks;
-		$q = _$q;
-		$rootScope = _$rootScope;
+	var rope, tasks, $q, $rootScope, calls, willCall, $timeout;
+	beforeEach(inject(['$injector', function($injector) {
+		rope = $injector.get('rope');
+		tasks = $injector.get('TaskService');
+		$q = $injector.get('$q');
+		$rootScope = $injector.get('$rootScope');
+		$timeout = $injector.get('$timeout');
 
 		calls = [];
 		willCall = rope.task(function(_log) {
@@ -289,6 +290,23 @@ describe('', function() {
 				.next(spy);
 
 			expect(spy).toHaveBeenCalledWith('teapot');
+		});
+	});
+
+	describe('wait', function() {
+
+		it('should halt chain execution', function() {
+			var spyE1 = jasmine.createSpy('checkpoint A'),
+				spyE2 = jasmine.createSpy('checkpoint B');
+
+			rope.next(spyE1)
+				.wait(400)
+				.next(spyE2);
+
+			expect(spyE1).toHaveBeenCalled();
+			expect(spyE2).not.toHaveBeenCalled();
+			$timeout.flush();
+			expect(spyE2).toHaveBeenCalled();
 		});
 	});
 

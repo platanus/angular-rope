@@ -2,7 +2,7 @@ angular.module('platanus.rope', [])
 /**
  * Promise chaining service.
  */
-.factory('rope', ['$q', function ($q) {
+.factory('rope', ['$q', '$timeout', function ($q, $timeout) {
 
 	var status = null; // The current status
 
@@ -331,6 +331,24 @@ angular.module('platanus.rope', [])
 		},
 
 		/**
+		 * Halts chain execution for _time milliseconds.
+		 *
+		 * @param  {float} _time Time to sleep (in ms)
+		 * @return {Chain} self
+		 */
+		wait: function(_time/*, _for */) {
+			this.promise = this.promise.then(function(_value) {
+				var defer = $q.defer();
+				$timeout(function() {
+					defer.resolve(_value);
+				}, _time);
+				return defer.promise;
+			});
+
+			return this;
+		},
+
+		/**
 		 * TODO.
 		 *
 		 * @param  {[type]} _fun [description]
@@ -338,22 +356,12 @@ angular.module('platanus.rope', [])
 		 * @return {[type]}      [description]
 		 */
 		forkEach: function(_fun, _ctx) {
-			this.next(function(_value) {
+			return this.next(function(_value) {
 				angular.forEach(_value, function(_value) {
 					(new Chain(confer(_value))).next(_fun, _ctx);
 				});
 			});
 		}
-
-		// wait: function(_seconds/*, _for */) {
-		// 	this.promise.then(function(_value) {
-		// 		var defer = $q.defer();
-		// 		$timeout(function() {
-		// 			defer.resolve(_value);
-		// 		}, _seconds);
-		// 		return defer.promise;
-		// 	});
-		// }
 	};
 
 	// The root chain acts as the service api, it is extended with some additional methods.

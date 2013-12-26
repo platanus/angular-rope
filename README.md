@@ -227,4 +227,14 @@ rope.next(selectDialog)
     .always(willCleanUp) // this will executed always
 ```
 
+### Other utility methods.
+
+`wait` can be used to introduce a delay in the chain
+
+```javascript
+rope.next(doSomething)
+    .wait(2000) // wait 2 seconds before executing next task.
+    .next(doSomethingDelayed);
+```
+
 TODO: forkEach
