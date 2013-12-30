@@ -389,6 +389,10 @@ describe('', function() {
 							.next(willCall(3))
 						.end()
 						.next(willCall(4))
+					.orNextIf(true)
+						.nextIf(true)
+							.next(willCall(5))
+						.end()
 					.end();
 
 				expect(calls).toEqual([1,2,4]);

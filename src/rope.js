@@ -1,3 +1,5 @@
+var DONE = {};
+
 angular.module('platanus.rope', [])
 /**
  * Promise chaining service.
@@ -8,7 +10,7 @@ angular.module('platanus.rope', [])
 
 	function confer(_value) {
 		if(_value && typeof _value.then === 'function') return _value;
-		if(_value && _value.$promise) return _value.$promise; // Temp restmod support, until restmod implements 'then'
+		// if(_value && _value.$promise) return _value.$promise; // Temp restmod support, until restmod implements 'then'
 
 		// return $q.when(_value); this will make the library behave more asynchronous in relation to UI.
 
@@ -23,7 +25,8 @@ angular.module('platanus.rope', [])
 			},
 			'finally': function(_cb) {
 				try {
-					return confer(_cb());
+					var r = _cb();
+					return typeof r == 'undefined' ? this : r;
 				} catch(e) {
 					return reject(e);
 				}
@@ -114,7 +117,8 @@ angular.module('platanus.rope', [])
 	Chain.prototype = {
 
 		$$skip: function() {
-			return (this.$$cstack && this.$$cstack.length > 0 && !this.$$cstack[this.$$cstack.length-1]);
+			// return true if the last stack element is false or null
+			return (this.$$ctxBlk && this.$$ctxBlk.length > 0 && !this.$$ctxBlk[this.$$ctxBlk.length-1]);
 		},
 
 		/**
@@ -164,7 +168,7 @@ angular.module('platanus.rope', [])
 			this.promise = this.promise.then(null, function(_error) {
 				// TODO: improve behavior, recovery, handle certain errors only, etc.
 				if(!self.$$skip()) {
-					return confer(tick(ctx, _fun, _error, true));
+					return tick(ctx, _fun, _error, true);
 				} else {
 					return reject(_error); // propagate
 				}
@@ -224,7 +228,7 @@ angular.module('platanus.rope', [])
 		 *         .nextIf(false)
 		 *             .next(task3) //wont execute
 		 *         .end()
-		 *         .next(task2) // will execute
+		 *         .next(task2) // will executed
 		 *     .end()
 		 * ```
 		 *
@@ -234,27 +238,32 @@ angular.module('platanus.rope', [])
 		 */
 		nextIf: function(_fun, _ctx) {
 			var self = this;
-			this.promise = this.promise
-				.then(function(_value) {
-					if(!self.$$cstack) {
-						self.$$cstack = [];
-					}
+			this.promise = this.promise.then(function(_value) {
+				if(self.$$skip()) {
+					// if parent block is skipped, skip this block too.
+					self.$$ctxBlk.push(false);
+				} else {
+					// initialize stack if this is the first time
+					if(!self.$$ctxBlk) self.$$ctxBlk = [];
 
 					if(typeof _fun !== 'undefined') {
+						// resolve condition using external value if given.
 						return confer(tick(_ctx, _fun, unseed(_value), false)).then(function(_bool) {
-							self.$$cstack.push(!!_bool);
+							self.$$ctxBlk.push(_bool === DONE ? null : !!_bool); // use special null value when if block is 'done'
 							return _value;
 						});
 					} else {
-						// just use previous value
-						self.$$cstack.push(_value);
-						return _value;
+						// if not just use previous value.
+						self.$$ctxBlk.push(!!_value);
 					}
-				})
-				.then(null, function(_err) {
-					self.$$cstack.push(false);
-					return reject(_err);
-				});
+				}
+
+				return _value;
+			}).then(null, function(_err) {
+				// on external or _fun error, skip entire block
+				self.$$ctxBlk.push(false);
+				return reject(_err);
+			});
 
 			return this;
 		},
@@ -262,35 +271,21 @@ angular.module('platanus.rope', [])
 		/**
 		 * Behaves similar to `nextIf`, but only evaluates to true if previous calls to `nextIf` or `orNextIf` evaluated to false.
 		 *
-		 * @param  {function|boolean|promise} _fun Optional boolean or boolean promise
+		 * @param  {function|boolean|promise} _fun Optional boolean or boolean promise.
 		 * @param  {object} _ctx if _fun is a function, this is the optional context on which the function is evaluated.
 		 * @return {Chain} self
 		 */
 		orNextIf: function(_fun, _ctx) {
-			var self = this;
-			this.promise = this.promise
-				.then(function(_value) {
-					var lastVal = self.$$cstack[self.$$cstack.length-1];
-					if(lastVal === false) {
-						return confer(tick(_ctx, _fun, unseed(_value), false)).then(function(_bool) {
-							self.$$cstack.pop();
-							self.$$cstack.push(!!_bool);
-							return _value;
-						});
-					} else if(lastVal) {
-						self.$$cstack.pop();
-						self.$$cstack.push(null); // use null to flag so no other or/orWhen call enters
-					}
+			var self = this, lastVal;
+			this.promise = this.promise['finally'](function() {
+				// TODO: check that stack is not empty
+				lastVal = self.$$ctxBlk.pop(); // always pop but keep value
+			});
 
-					return _value;
-				})
-				.then(null, function(_err) {
-					self.$$cstack.pop();
-					self.$$cstack.push(false);
-					return reject(_err);
-				});
-
-			return this;
+			return this.nextIf(function() {
+				// only consider block if last value was false
+				return lastVal === false ? _fun : DONE;
+			}, _ctx);
 		},
 
 		/**
@@ -303,24 +298,24 @@ angular.module('platanus.rope', [])
 		/**
 		 * Executes following tasks only if last task value equals given value.
 		 *
-		 * @param  {mixed} _value Value to copare last value with
+		 * @param {mixed} _value Value to compare last value with
 		 * @return {Chain} self
 		 */
 		nextCase: function(_value) {
 			return this.nextIf(function(_other) {
-				return _value === _other;
+				return _value == _other;
 			});
 		},
 
 		/**
 		 * Like `nextCase`, but only evaluates to true if previous calls to `nextCase` or `orNextCase` evaluated to false.
 		 *
-		 * @param  {mixed} _value Value to copare last value with
+		 * @param {mixed} _value Value to compare last value with
 		 * @return {Chain} self
 		 */
 		orNextCase: function(_value) {
 			return this.orNextIf(function(_other) {
-				return _value === _other;
+				return _value == _other;
 			});
 		},
 
@@ -332,7 +327,7 @@ angular.module('platanus.rope', [])
 		end: function() {
 			var self = this;
 			this.promise = this.promise['finally'](function() {
-				self.$$cstack.pop();
+				self.$$ctxBlk.pop();
 			});
 			return this;
 		},
