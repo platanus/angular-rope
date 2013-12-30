@@ -227,6 +227,17 @@ rope.next(selectDialog)
     .always(willCleanUp) // this will executed always
 ```
 
+`exit` can be used to break a chain execution, no matter how deep in conditional blocks it is.
+
+```javascript
+rope.next(selectDialog)
+    .nextCase('launch') // If selectDialog resolves to 'launch'
+      .next(willLaunch)
+      .exit() // nothing else will be executed after this (not even always blocks)
+    .end()
+    .always(willCleanUp) // wont get executed.
+```
+
 ### Other utility methods.
 
 `wait` can be used to introduce a delay in the chain

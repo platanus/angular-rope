@@ -118,7 +118,7 @@ angular.module('platanus.rope', [])
 
 		$$skip: function() {
 			// return true if the last stack element is false or null
-			return (this.$$ctxBlk && this.$$ctxBlk.length > 0 && !this.$$ctxBlk[this.$$ctxBlk.length-1]);
+			return this.$$exit || (this.$$ctxBlk && this.$$ctxBlk.length > 0 && !this.$$ctxBlk[this.$$ctxBlk.length-1]);
 		},
 
 		/**
@@ -330,6 +330,20 @@ angular.module('platanus.rope', [])
 				self.$$ctxBlk.pop();
 			});
 			return this;
+		},
+
+		/**
+		 * Breaks current chain, no more tasks are executed.
+		 *
+		 * Exits does not bubble from an child chain.
+		 *
+		 * @return {Chain} self
+		 */
+		exit: function() {
+			var self = this;
+			return this.next(function() {
+				self.$$exit = true;
+			});
 		},
 
 		/**

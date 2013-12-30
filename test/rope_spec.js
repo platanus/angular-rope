@@ -439,5 +439,26 @@ describe('', function() {
 				expect(calls).toEqual([1,3,4]);
 			});
 		});
+
+		describe('exit', function() {
+
+			it('should break a chain', function() {
+				rope.next(willCall(1))
+					.nextIf(true)
+						.exit()
+						.next(willCall(2))
+						.nextIf(true)
+							.next(willCall(3))
+						.end()
+						.next(willCall(4))
+					.orNextIf(true)
+						.nextIf(true)
+							.next(willCall(5))
+						.end()
+					.end();
+
+				expect(calls).toEqual([1]);
+			});
+		});
 	});
 });
