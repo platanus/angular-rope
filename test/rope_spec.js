@@ -70,14 +70,14 @@ describe('', function() {
 		});
 	});
 
-	describe('inherit', function() {
+	describe('loadParentStatus', function() {
 
 		it('should inherit parent context status if no errors', function() {
 			var spyS = jasmine.createSpy('success'), spyE = jasmine.createSpy('error');
 
 			rope.seed('something')
 				.next(function() {
-					rope.inherit()
+					rope.loadParentStatus()
 						.next(spyS)
 						.handle(spyE);
 				});
@@ -91,7 +91,7 @@ describe('', function() {
 
 			rope.next(function() { return rope.reject('an error'); })
 				.always(function() {
-					rope.inherit()
+					rope.loadParentStatus()
 						.next(spyS)
 						.handle(spyE);
 				});
@@ -510,6 +510,43 @@ describe('', function() {
 				}, ctx);
 
 				expect(ctx.test).toEqual('bye');
+			});
+		});
+	});
+
+	describe('chain stack methods', function() {
+
+		describe('push', function() {
+			it('should put the passed values on top of the stack', function() {
+				var stack = rope.push('hello','world').stack;
+				expect(stack.pop()).toEqual('world');
+				expect(stack.pop()).toEqual('hello');
+			});
+
+			it('should put the chain value on top of the stack if no values are passed', function() {
+				var stack = rope.seed('ontop').push().stack;
+				expect(stack.pop()).toEqual('ontop');
+			});
+		});
+
+		describe('pop', function() {
+			it('should load the top value of the stack as the chain value', function() {
+				var spy = jasmine.createSpy('pop'),
+					stack = rope.push('hello').pop().next(spy).stack;
+
+				expect(stack.length).toEqual(0);
+				expect(spy).toHaveBeenCalledWith('hello');
+			});
+
+			it('should put the chain value in a context property if a name is given', function() {
+				var ctx = {},
+					stack = rope.push('hello')
+								.next(function() {
+									rope.loadParentStack().pop('test');
+								}, ctx).stack;
+
+				expect(stack.length).toEqual(0);
+				expect(ctx.test).toEqual('hello');
 			});
 		});
 	});

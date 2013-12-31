@@ -256,4 +256,4 @@ rope.seed({ method: function(_log) { console.log(_log); } })
     .apply('method', [ 'im a flying toaster' ]);
 ```
 
-TODO: forkEach
+TODO: `loadParentStatus`, `loadParentStack`, `nextUnless`, `orNextUnless`, `get`, `set`, `push`, `pop`, `forkEach.
