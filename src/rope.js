@@ -289,6 +289,28 @@ angular.module('platanus.rope', [])
 		},
 
 		/**
+		 * The negated version of `nextIf`
+		 */
+		nextUnless: function(_fun, _ctx) {
+			return this.nextIf(function(_value) {
+				return confer(tick(this, _fun, _value, false)).then(function(_bool) {
+					return !_bool;
+				});
+			}, _ctx);
+		},
+
+		/**
+		 * The negated version of `orNextIf`
+		 */
+		orNextUnless: function(_fun, _ctx) {
+			return this.orNextIf(function(_value) {
+				return confer(tick(this, _fun, _value, false)).then(function(_bool) {
+					return !_bool;
+				});
+			}, _ctx);
+		},
+
+		/**
 		 * Shorcut for `orNextIf(true)`
 		 */
 		orNext: function() {

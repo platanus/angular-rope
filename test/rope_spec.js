@@ -426,6 +426,31 @@ describe('', function() {
 			});
 		});
 
+		describe('nextUnless', function() {
+
+			it('should enter if condition is false', function() {
+				rope.next(willCall(1))
+					.nextUnless(function(_value) { return _value != 1; })
+						.next(willCall(2))
+					.end();
+
+				expect(calls).toEqual([1,2]);
+			});
+		});
+
+		describe('orNextUnless', function() {
+
+			it('should enter if condition is false', function() {
+				rope.next(willCall(1))
+					.nextIf(false)
+						.next(willCall(2))
+					.orNextUnless(function(_value) { return _value != 1; })
+						.next(willCall(3))
+					.end();
+
+				expect(calls).toEqual([1,3]);
+			});
+		});
 
 		describe('nextCase and orNextCase', function() {
 
