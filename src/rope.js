@@ -423,7 +423,34 @@ angular.module('platanus.rope', [])
 					(new Chain(confer(_value))).next(_fun, _ctx);
 				});
 			});
+		},
+
+		/**
+		 * Loads a context property as the current chain value
+		 *
+		 * @param  {string} _name Property name
+		 * @return {Chain} self
+		 */
+		get: function(_name) {
+			return this.next(function() {
+				return this[_name];
+			});
+		},
+
+		/**
+		 * Sets a context property value to the current chain value.
+		 *
+		 * @param {string} _name Property name
+		 * @return {Chain} self
+		 */
+		set: function(_name) {
+			return this.next(function(_value) {
+				this[_name] = _value;
+				return _value;
+			});
 		}
+
+		// TODO: push / pop?
 	};
 
 	// The root chain acts as the service api, it is extended with some additional methods.
@@ -479,16 +506,16 @@ angular.module('platanus.rope', [])
 
 		seed: function(_value) {
 			return new Chain(confer(new Seed(_value)));
-		},
-
-		next: function(_fun, _ctx) {
-			return (new Chain(confer(null))).next(_fun, _ctx);
-		},
-
-		nextIf: function(_fun, _ctx) {
-			return (new Chain(confer(null))).nextIf(_fun, _ctx);
 		}
 	};
+
+	// add chain starting methods to root node.
+	angular.forEach(['next', 'nextIf', 'nextUnless', 'get'], function(_name) {
+		var fun = Chain.prototype[_name];
+		rootNode[_name] = function() {
+			return fun.apply(new Chain(confer(null)), arguments);
+		};
+	});
 
 	return rootNode;
 }]);

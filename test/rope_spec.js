@@ -486,4 +486,31 @@ describe('', function() {
 			});
 		});
 	});
+
+	describe('context manipulation:', function() {
+
+		describe('get', function() {
+			it('should load a context property in chain', function() {
+				var ctx = { test: 'hi there' }, spy = jasmine.createSpy('get spy');
+
+				rope.next(function() {
+					rope.get('test').next(spy);
+				}, ctx);
+
+				expect(spy).toHaveBeenCalledWith('hi there');
+			});
+		});
+
+		describe('set', function() {
+			it('should set a context property in chain', function() {
+				var ctx = { test: 'hi there' };
+
+				rope.next(function() {
+					rope.seed('bye').set('test');
+				}, ctx);
+
+				expect(ctx.test).toEqual('bye');
+			});
+		});
+	});
 });
