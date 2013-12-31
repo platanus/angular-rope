@@ -1,6 +1,6 @@
 /**
  * Angular Promise Chaining Service
- * @version v0.2.4 - 2013-12-30
+ * @version v0.3.0 - 2013-12-31
  * @link https://github.com/platanus/angular-rope
  * @author Ignacio Baixas <ignacio@platan.us>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -36,7 +36,7 @@ angular.module('platanus.rope', [])
 			'finally': function(_cb) {
 				try {
 					var r = _cb();
-					return typeof r == 'undefined' ? this : r;
+					return typeof r === 'undefined' ? this : r;
 				} catch(e) {
 					return reject(e);
 				}
@@ -68,13 +68,15 @@ angular.module('platanus.rope', [])
 		};
 	}
 
-	function tick(_ctx, _fun, _data, _error) {
+	// callback execution logic for chain actions
+	function tick(_chain, _ctx, _fun, _data, _error) {
 		var rval = _fun, oldStatus, chainLen, i;
 
 		while(typeof rval === 'function') {
 			try {
 				oldStatus = status;
 				status = {
+					parent: _chain, // the parent chain
 					chains: [],		// the child chains
 					context: _ctx,	// propagate default context
 					data: _data,	// store data in case inheritance is used
@@ -106,6 +108,11 @@ angular.module('platanus.rope', [])
 		return typeof rval === 'undefined' && !_error ? _data : rval;
 	}
 
+	// return true if current chain step should be skipped
+	function skip(_chain) {
+		return _chain.$$exit || (_chain.$$ctxBlk && _chain.$$ctxBlk.length > 0 && !_chain.$$ctxBlk[_chain.$$ctxBlk.length-1]);
+	}
+
 	function context(_override) {
 		return _override || (status ? status.context : null);
 	}
@@ -126,9 +133,42 @@ angular.module('platanus.rope', [])
 
 	Chain.prototype = {
 
-		$$skip: function() {
-			// return true if the last stack element is false or null
-			return this.$$exit || (this.$$ctxBlk && this.$$ctxBlk.length > 0 && !this.$$ctxBlk[this.$$ctxBlk.length-1]);
+		/**
+		 * Loads the parent promise status into this chain.
+		 *
+		 * Should only be called in nested chains (like tasks)
+		 *
+		 * @return {Chain} self
+		 */
+		loadParentStatus: function() {
+			var cstatus = status;
+			return this.next(function() {
+				return cstatus.error ? reject(cstatus.data) : confer(cstatus.data);
+			});
+		},
+
+		/**
+		 * Loads the parent stack into this chain.
+		 *
+		 * Should only be called in nested chains (like tasks)
+		 *
+		 * @return {Chain} self
+		 */
+		loadParentStack: function() {
+			var self = this, cstatus = status;
+			return this.next(function(_value) {
+				self.stack = cstatus.parent.stack; // should this be a shallow copy?
+				return _value;
+			});
+		},
+
+		/**
+		 * Loads both the parent's promise status and its stack into the child chain.
+		 *
+		 * @return {Chain} self
+		 */
+		loadParent: function() {
+			return this.loadParentStack().loadParentStatus();
 		},
 
 		/**
@@ -154,8 +194,8 @@ angular.module('platanus.rope', [])
 			var self = this, ctx = context(_ctx);
 
 			this.promise = this.promise.then(function(_val) {
-				if(!self.$$skip()) {
-					return tick(ctx, _fun, unseed(_val), false);
+				if(!skip(self)) {
+					return tick(self, ctx, _fun, unseed(_val), false);
 				} else {
 					return _val; // propagate
 				}
@@ -177,8 +217,8 @@ angular.module('platanus.rope', [])
 
 			this.promise = this.promise.then(null, function(_error) {
 				// TODO: improve behavior, recovery, handle certain errors only, etc.
-				if(!self.$$skip()) {
-					return tick(ctx, _fun, _error, true);
+				if(!skip(self)) {
+					return tick(self, ctx, _fun, _error, true);
 				} else {
 					return reject(_error); // propagate
 				}
@@ -249,7 +289,7 @@ angular.module('platanus.rope', [])
 		nextIf: function(_fun, _ctx) {
 			var self = this;
 			this.promise = this.promise.then(function(_value) {
-				if(self.$$skip()) {
+				if(skip(self)) {
 					// if parent block is skipped, skip this block too.
 					self.$$ctxBlk.push(false);
 				} else {
@@ -258,7 +298,7 @@ angular.module('platanus.rope', [])
 
 					if(typeof _fun !== 'undefined') {
 						// resolve condition using external value if given.
-						return confer(tick(_ctx, _fun, unseed(_value), false)).then(function(_bool) {
+						return confer(tick(self, _ctx, _fun, unseed(_value), false)).then(function(_bool) {
 							self.$$ctxBlk.push(_bool === DONE ? null : !!_bool); // use special null value when if block is 'done'
 							return _value;
 						});
@@ -295,6 +335,30 @@ angular.module('platanus.rope', [])
 			return this.nextIf(function() {
 				// only consider block if last value was false
 				return lastVal === false ? _fun : DONE;
+			}, _ctx);
+		},
+
+		/**
+		 * The negated version of `nextIf`
+		 */
+		nextUnless: function(_fun, _ctx) {
+			var self = this;
+			return this.nextIf(function(_value) {
+				return confer(tick(self, this, _fun, _value, false)).then(function(_bool) {
+					return !_bool;
+				});
+			}, _ctx);
+		},
+
+		/**
+		 * The negated version of `orNextIf`
+		 */
+		orNextUnless: function(_fun, _ctx) {
+			var self = this;
+			return this.orNextIf(function(_value) {
+				return confer(tick(self, this, _fun, _value, false)).then(function(_bool) {
+					return !_bool;
+				});
 			}, _ctx);
 		},
 
@@ -411,7 +475,61 @@ angular.module('platanus.rope', [])
 					(new Chain(confer(_value))).next(_fun, _ctx);
 				});
 			});
+		},
+
+		/**
+		 * Loads a context property as the current chain value
+		 *
+		 * @param  {string} _name Property name
+		 * @return {Chain} self
+		 */
+		get: function(_name) {
+			return this.next(function() {
+				return this[_name];
+			});
+		},
+
+		/**
+		 * Sets a context property value to the current chain value.
+		 *
+		 * @param {string} _name Property name
+		 * @return {Chain} self
+		 */
+		set: function(_name) {
+			return this.next(function(_value) {
+				this[_name] = _value;
+				return _value;
+			});
+		},
+
+		push: function() {
+			var self = this, args = arguments;
+			return this.next(function(_value) {
+				if(!self.stack) self.stack = [];
+				if(args.length > 0) {
+					// TODO: inputed values should be resolved (could be promises or functions)
+					Array.prototype.push.apply(self.stack, args);
+				} else {
+					self.stack.push(_value);
+				}
+				return _value;
+			});
+		},
+
+		pop: function(_name) {
+			var self = this;
+			return this.next(function(_value) {
+				if(!self.stack) self.stack = [];
+				if(_name) {
+					this[_name] = self.stack.pop();
+					return _value;
+				} else {
+					return self.stack.pop();
+				}
+			});
 		}
+
+		// TODO: push / pop?
 	};
 
 	// The root chain acts as the service api, it is extended with some additional methods.
@@ -451,32 +569,16 @@ angular.module('platanus.rope', [])
 					}, self);
 				};
 			};
-		},
-
-		/**
-		 * Allows a child chain to inherit the status status (error or not)
-		 *
-		 * This is usefull for tasks than need to access the current status to perform
-		 * certain different actions.
-		 *
-		 * @return {Chain} new chain
-		 */
-		inherit: function() {
-			return new Chain(status.error ? reject(status.data) : confer(status.data));
-		},
-
-		seed: function(_value) {
-			return new Chain(confer(new Seed(_value)));
-		},
-
-		next: function(_fun, _ctx) {
-			return (new Chain(confer(null))).next(_fun, _ctx);
-		},
-
-		nextIf: function(_fun, _ctx) {
-			return (new Chain(confer(null))).nextIf(_fun, _ctx);
 		}
 	};
+
+	// forward some chain methods to root node.
+	angular.forEach(['loadParentStatus', 'loadParentStack', 'loadParent', 'seed', 'next', 'nextIf', 'nextUnless', 'get', 'set', 'push'], function(_name) {
+		var fun = Chain.prototype[_name];
+		rootNode[_name] = function() {
+			return fun.apply(new Chain(confer(null)), arguments);
+		};
+	});
 
 	return rootNode;
 }]);
