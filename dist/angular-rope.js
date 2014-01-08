@@ -1,6 +1,6 @@
 /**
  * Angular Promise Chaining Service
- * @version v0.3.1 - 2014-01-08
+ * @version v0.3.2 - 2014-01-08
  * @link https://github.com/platanus/angular-rope
  * @author Ignacio Baixas <ignacio@platan.us>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -565,20 +565,10 @@ angular.module('platanus.rope', [])
 				return function() {
 					// isolate task context inside a new chain, so every chain generated
 					// inside the task is bound to the same context (self)
-					var r, oldCtx;
-					try {
-						if(status) {
-							oldCtx = status.context;
-							status.context = self;
-						}
-						r = _fun.apply(self, args);
-					} finally {
-						if(status) {
-							status.context = oldCtx;
-						}
-					}
-
-					return r;
+					if(!status) throw 'Tasks must be called using a rope chain method';
+					return tick(status.parent, self, function() {
+						return _fun.apply(this, args);
+					}, status.data, status.error);
 				};
 			};
 		}
