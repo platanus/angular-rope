@@ -54,7 +54,7 @@ describe('', function() {
 				});
 			}) };
 
-			service.task()();
+			rope.next(service.task());
 			expect(ctx).toBe(service);
 		});
 
@@ -65,8 +65,20 @@ describe('', function() {
 				};
 			}) };
 
-			service.task()('hello');
+			rope.seed('hello').next(service.task());
 			expect(last).toEqual('hello');
+		});
+
+		it('should have access to parent status', function() {
+			var spy = jasmine.createSpy('task'),
+				service = { task: rope.task(function() {
+					rope.loadParentStatus().handle(spy);
+				}) };
+
+			rope.next(function() { throw 'whatever'; })
+				.always(service.task());
+
+			expect(spy).toHaveBeenCalledWith('whatever');
 		});
 	});
 

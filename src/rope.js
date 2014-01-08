@@ -551,12 +551,24 @@ angular.module('platanus.rope', [])
 		 */
 		task: function(_fun) {
 			return function() {
-				var args = arguments, self = this;
-				return function(_value) {
-					// isolate task context inside a new chain.
-					rootNode.seed(_value).next(function() {
-						return _fun.apply(this, args);
-					}, self);
+				var self = this, args = arguments;
+				return function() {
+					// isolate task context inside a new chain, so every chain generated
+					// inside the task is bound to the same context (self)
+					var r, oldCtx;
+					try {
+						if(status) {
+							oldCtx = status.context;
+							status.context = self;
+						}
+						r = _fun.apply(self, args);
+					} finally {
+						if(status) {
+							status.context = oldCtx;
+						}
+					}
+
+					return r;
 				};
 			};
 		}
