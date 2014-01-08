@@ -35,16 +35,11 @@ describe('', function() {
 
 	describe('task', function() {
 
-		it('should generate a function that returns a function', function() {
+		it('should generate a function that can only be called using a rope method', function() {
 			var handler = jasmine.createSpy(),
 				task = rope.task(handler);
 
-			expect(typeof task).toBe('function');
-			expect(typeof task('hello')).toBe('function');
-			expect(handler).not.toHaveBeenCalled();
-
-			task('hello')();
-			expect(handler).toHaveBeenCalledWith('hello');
+			expect(task('hello')).toThrow();
 		});
 
 		it('should preserve context', function() {
@@ -53,6 +48,16 @@ describe('', function() {
 					ctx = this;
 				});
 			}) };
+
+			rope.next(service.task());
+			expect(ctx).toBe(service);
+		});
+
+		it('should execute returned functions using the same context', function() {
+			var ctx,
+				service = { task: rope.task(function() {
+					return function() { ctx = this; };
+				}) };
 
 			rope.next(service.task());
 			expect(ctx).toBe(service);
