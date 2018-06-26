@@ -1,4 +1,17 @@
 {
+  "name": "angular-rope",
+  "version": "0.3.2",
+  "authors": [
+    "Ignacio Baixas <ignacio@platan.us>"
+  ],
+  "description": "Angular Promise Chaining Service",
+  "license": "MIT",
+  "homepage": "https://github.com/platanus/angular-rope",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/platanus/angular-rope.git"
+  },
+  "main": "./dist/angular-rope.min.js",
   "engines": {
     "node": ">= 0.9"
   },
